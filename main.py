@@ -2,36 +2,53 @@ import logging
 from itertools import groupby
 
 import openpyxl
+from natsort import natsorted
 from openpyxl.reader.excel import load_workbook
 from openpyxl.styles import PatternFill
 
-from natsort import natsorted
-
-from read_outputs_folder import read_outputs
+from read_output_folders import read_output
+from result_holder import ResultHolder
 
 logging.basicConfig(level=logging.DEBUG)
 
 logger = logging.getLogger()
 
 
-def prepare_key(algorithm_aliases, key):
-    if key[10] is None:
-        return algorithm_aliases[key[1] + "_" + key[9]]
-    elif key[1] is None and key[0] == "phy":
-        if key[11] is None and key[12] is None:
-            if key[4] is not None and key[5] is not None:
-                return algorithm_aliases[key[2] + "_" + key[10]]
-            else:
-                return algorithm_aliases[key[2] + "_" + key[10]]
-        else:
-            # TODO:KSPWLO
-            pass
-    elif key[1] is not None and key[0] == "mtr":
-        if key[11] is None and key[12] is None:
-            if key[4] is not None and key[5] is not None:
-                return algorithm_aliases[key[2] + "_" + key[1] + "_" + key[10]]
-            elif key[4] is None and key[5] is None:
-                return algorithm_aliases[key[2] + "_" + key[1] + "_" + key[10]]
+def prepare_key(algorithm_aliases, result_holder):
+    if "WPM" in result_holder.algorithm and "LWR" not in result_holder.algorithm and "CWR" not in result_holder.algorithm:
+        if result_holder.wpm_version == "v1":
+            return algorithm_aliases[
+                result_holder.path_finding_method + "_" + result_holder.algorithm + "_" + result_holder.wpm_version]
+        elif result_holder.wpm_version == "v2":
+            return algorithm_aliases[
+                result_holder.path_finding_method + "_" + result_holder.algorithm + "_" + result_holder.wpm_version + "_" + result_holder.wpm_value_type]
+    elif "WPM" in result_holder.algorithm and "LWR" in result_holder.algorithm and "CWR" not in result_holder.algorithm:
+        if result_holder.wpm_version == "v1":
+            return algorithm_aliases[
+                result_holder.path_finding_method + "_" + result_holder.algorithm + "_" + result_holder.wpm_version]
+        elif result_holder.wpm_version == "v2":
+            return algorithm_aliases[
+                result_holder.path_finding_method + "_" + result_holder.algorithm + "_" + result_holder.wpm_version + "_" + result_holder.wpm_value_type]
+    elif "WPM" in result_holder.algorithm and "LWR" in result_holder.algorithm and "CWR" in result_holder.algorithm:
+        if result_holder.wpm_version == "v1":
+            return algorithm_aliases[
+                result_holder.path_finding_method + "_" + result_holder.algorithm + "_" + result_holder.wpm_version]
+        elif result_holder.wpm_version == "v2":
+            return algorithm_aliases[
+                result_holder.path_finding_method + "_" + result_holder.algorithm + "_" + result_holder.wpm_version + "_" + result_holder.wpm_value_type]
+    elif "WPM" in result_holder.algorithm and "LWR" not in result_holder.algorithm and "CWR" in result_holder.algorithm:
+        if result_holder.wpm_version == "v1":
+            return algorithm_aliases[
+                result_holder.path_finding_method + "_" + result_holder.algorithm + "_" + result_holder.wpm_version]
+        elif result_holder.wpm_version == "v2":
+            return algorithm_aliases[
+                result_holder.path_finding_method + "_" + result_holder.algorithm + "_" + result_holder.wpm_version + "_" + result_holder.wpm_value_type]
+    elif result_holder.path_finding_method == "shortestPath":
+        return algorithm_aliases[result_holder.path_finding_method + "_" + result_holder.algorithm]
+    elif "U" in result_holder.algorithm:
+        return algorithm_aliases[result_holder.path_finding_method + "_" + result_holder.algorithm]
+    else:
+        return algorithm_aliases[result_holder.path_finding_method + "_" + result_holder.algorithm]
 
 
 def prepare_value(value):
@@ -40,22 +57,24 @@ def prepare_value(value):
     value_list.append(value.topology_result.o1)
     value_list.append(value.topology_result.o2)
     value_list.append(value.topology_result.o3)
+    value_list.append(value.topology_result.average_wcd)
     value_list.append(value.topology_result.max_util)
-    value_list.append(value.topology_result.average)
-    value_list.append(value.topology_result.variance)
+    value_list.append(value.topology_result.average_util)
+    value_list.append(value.topology_result.util_variance)
     value_list.append(value.topology_result.time)
     return value_list
 
 
-def group_outputs(algorithm_aliases, outputs_list):
-    grouped = groupby(outputs_list, key=lambda x: (
-        x.solver, x.mtr, x.algorithm, x.randomization, x.normalization, x.cObjective, x.wAVB, x.wTT, x.wLength, x.wUtil,
-        x.method, x.kspwlo_algorithm, x.kspwlo_threshold, x.k, x.ba, x.overload))
+def group_output(algorithm_aliases, output_list):
+    grouped = groupby(output_list, key=lambda x: (
+        x.routing, x.mtr_name, x.path_finding_method, x.algorithm, x.lwr, x.k, x.mcdm_objective, x.wsm_normalization,
+        x.cwr, x.w_srt, x.w_tt, x.w_length, x.w_util, x.wpm_version, x.wpm_value_type, x.metaheuristic_name,
+        x.evaluator_name))
 
-    grouped_results = dict()
+    grouped_result_dict = {}
 
     for key, group in grouped:
-        k_results = dict()
+        k_result_list = {}
         if logger.isEnabledFor(logging.DEBUG):
             logging.debug(key)
 
@@ -65,28 +84,47 @@ def group_outputs(algorithm_aliases, outputs_list):
             for each_group in group_sorted:
                 logging.debug(each_group)
 
-        new_key = prepare_key(algorithm_aliases, key)
+        result_holder = ResultHolder()
+        result_holder.routing = key[0]
+        result_holder.mtr_name = key[1]
+        result_holder.path_finding_method = key[2]
+        result_holder.algorithm = key[3]
+        result_holder.lwr = key[4]
+        result_holder.k = key[5]
+        result_holder.mcdm_objective = key[6]
+        result_holder.wsm_normalization = key[7]
+        result_holder.cwr = key[8]
+        result_holder.w_srt = key[9]
+        result_holder.w_tt = key[10]
+        result_holder.w_length = key[11]
+        result_holder.w_util = key[12]
+        result_holder.wpm_version = key[13]
+        result_holder.wpm_value_type = key[14]
+        result_holder.metaheuristic_name = key[15]
+        result_holder.evaluator_name = key[16]
+
+        new_key = prepare_key(algorithm_aliases, result_holder)
 
         for each_group in group_sorted:
-            if new_key not in k_results:
-                k_results[new_key] = list()
-                k_results[new_key].append(prepare_value(each_group))
+            if new_key not in k_result_list:
+                k_result_list[new_key] = list()
+                k_result_list[new_key].append(prepare_value(each_group))
             else:
-                k_results[new_key].append(prepare_value(each_group))
+                k_result_list[new_key].append(prepare_value(each_group))
 
-        if key[13] not in grouped_results:
-            grouped_results[key[13]] = list()
-            grouped_results[key[13]].append(k_results)
+        if result_holder.k not in grouped_result_dict:
+            grouped_result_dict[result_holder.k] = list()
+            grouped_result_dict[result_holder.k].append(k_result_list)
         else:
-            grouped_results[key[13]].append(k_results)
+            grouped_result_dict[result_holder.k].append(k_result_list)
 
-    return grouped_results
+    return grouped_result_dict
 
 
-def sort_grouped_outputs(grouped_outputs):
-    first_object = grouped_outputs.pop(None)
+def sort_grouped_output_list(grouped_output_list):
+    first_object = grouped_output_list.pop(None)
 
-    sorted_dict = natsorted(grouped_outputs.items(), key=lambda x: x[0])
+    sorted_dict = natsorted(grouped_output_list.items(), key=lambda x: x[0])
 
     new_dict = dict()
     new_dict[None] = first_object
@@ -97,20 +135,20 @@ def sort_grouped_outputs(grouped_outputs):
     return new_dict
 
 
-def write_to_excel(wb, algorithm_aliases, sheets, output_list):
-    grouped_outputs = group_outputs(algorithm_aliases, output_list)
-    sorted_grouped_outputs = sort_grouped_outputs(grouped_outputs)
+def write_to_excel(wb, algorithm_alias_dict, sheet_list, output_list):
+    grouped_output_list = group_output(algorithm_alias_dict, output_list)
+    sorted_grouped_output_list = sort_grouped_output_list(grouped_output_list)
 
-    for key, value in sorted_grouped_outputs.items():
+    for key, value in sorted_grouped_output_list.items():
         sorted_to_algorithm_aliases = sorted(value,
-                                             key=lambda d: list(algorithm_aliases.values()).index(list(d.keys())[0]))
-        sorted_grouped_outputs[key] = sorted_to_algorithm_aliases
+                                             key=lambda d: list(algorithm_alias_dict.values()).index(list(d.keys())[0]))
+        sorted_grouped_output_list[key] = sorted_to_algorithm_aliases
 
-    first_key = list(sorted_grouped_outputs.keys())[1]
+    first_key = list(sorted_grouped_output_list.keys())[1]
     is_first_sheet = True
-    for key, value in sorted_grouped_outputs.items():
-        for sheet in sheets:
-            if sheet == sheets[0]:
+    for key, value in sorted_grouped_output_list.items():
+        for sheet in sheet_list:
+            if sheet == sheet_list[0]:
                 if is_first_sheet:
                     new_sheet = wb.active
                     new_sheet.title = sheet + "=" + first_key
@@ -130,11 +168,13 @@ def write_to_excel(wb, algorithm_aliases, sheets, output_list):
                     col += max_column + 1
 
                 for output_dict in value:
-                    for innerkey, innervalue in output_dict.items():
+                    for inner_key, inner_value in output_dict.items():
                         row = 1
-                        new_sheet.cell(row=row, column=col + 1, value=innerkey)
+                        new_sheet.column_dimensions[
+                            new_sheet.cell(row=row, column=col + 1, value=inner_key).column_letter].width = len(
+                            inner_key) + 5
                         row += 1
-                        for result in innervalue:
+                        for result in inner_value:
                             column_number = 0
                             new_sheet.cell(row=row, column=col + column_number, value=result[0])
                             column_number += 1
@@ -142,9 +182,9 @@ def write_to_excel(wb, algorithm_aliases, sheets, output_list):
                             column_number += 1
                             row += 1
 
-                        col += len(innervalue[0][:2])
+                        col += len(inner_value[0][:2])
 
-            elif sheet == sheets[1]:
+            elif sheet == sheet_list[1]:
                 if key is not None:
                     if sheet + "=" + key in wb.sheetnames:
                         new_sheet = wb[sheet + "=" + key]
@@ -162,11 +202,13 @@ def write_to_excel(wb, algorithm_aliases, sheets, output_list):
                     col += max_column + 1
 
                 for output_dict in value:
-                    for innerkey, innervalue in output_dict.items():
+                    for inner_key, inner_value in output_dict.items():
                         row = 1
-                        new_sheet.cell(row=row, column=col + 1, value=innerkey)
+                        new_sheet.column_dimensions[
+                            new_sheet.cell(row=row, column=col + 1, value=inner_key).column_letter].width = len(
+                            inner_key) + 5
                         row += 1
-                        for result in innervalue:
+                        for result in inner_value:
                             column_number = 0
                             new_sheet.cell(row=row, column=col + column_number, value=result[0])
                             column_number += 1
@@ -176,9 +218,9 @@ def write_to_excel(wb, algorithm_aliases, sheets, output_list):
                             column_number += 1
                             row += 1
 
-                        col += len(innervalue[0][2:4]) + 1
+                        col += len(inner_value[0][2:4]) + 1
 
-            elif sheet == sheets[2]:
+            elif sheet == sheet_list[2]:
                 if key is not None:
                     if sheet + "=" + key in wb.sheetnames:
                         new_sheet = wb[sheet + "=" + key]
@@ -196,15 +238,49 @@ def write_to_excel(wb, algorithm_aliases, sheets, output_list):
                     col += max_column + 1
 
                 for output_dict in value:
-                    for innerkey, innervalue in output_dict.items():
+                    for inner_key, inner_value in output_dict.items():
                         row = 1
-                        new_sheet.cell(row=row, column=col + 1, value=innerkey)
+                        new_sheet.column_dimensions[
+                            new_sheet.cell(row=row, column=col + 1, value=inner_key).column_letter].width = len(
+                            inner_key) + 5
                         row += 1
-                        for result in innervalue:
+                        for result in inner_value:
                             column_number = 0
                             new_sheet.cell(row=row, column=col + column_number, value=result[0])
                             column_number += 1
                             new_sheet.cell(row=row, column=col + column_number, value=float(result[4]))
+                            column_number += 1
+                            row += 1
+
+                        col += len(inner_value[0][:2])
+
+            elif sheet == sheet_list[3]:
+                if key is not None:
+                    if sheet + "=" + key in wb.sheetnames:
+                        new_sheet = wb[sheet + "=" + key]
+                    else:
+                        new_sheet = wb.create_sheet(title=sheet + "=" + key)
+                else:
+                    new_sheet = wb.create_sheet(title=sheet + "=" + first_key)
+
+                max_column = new_sheet.max_column
+
+                col = 0
+                if max_column == 1:
+                    col = 1
+                else:
+                    col += max_column + 1
+
+                for output_dict in value:
+                    for inner_key, inner_value in output_dict.items():
+                        row = 1
+                        new_sheet.column_dimensions[
+                            new_sheet.cell(row=row, column=col + 1, value=inner_key).column_letter].width = len(
+                            inner_key) + 5
+                        row += 1
+                        for result in inner_value:
+                            column_number = 0
+                            new_sheet.cell(row=row, column=col + column_number, value=result[0])
                             column_number += 1
                             new_sheet.cell(row=row, column=col + column_number, value=float(result[5]))
                             column_number += 1
@@ -212,9 +288,11 @@ def write_to_excel(wb, algorithm_aliases, sheets, output_list):
                             column_number += 1
                             new_sheet.cell(row=row, column=col + column_number, value=float(result[7]))
                             column_number += 1
+                            new_sheet.cell(row=row, column=col + column_number, value=float(result[8]))
+                            column_number += 1
                             row += 1
 
-                        col += len(innervalue[0][4:8]) + 1
+                        col += len(inner_value[0][5:9]) + 1
 
     wb.save("output.xlsx")
 
@@ -239,54 +317,30 @@ def paint_cells(green_fill, yellow_fill, red_fill, workbook):
             j = 2
             for row in sheet.iter_rows(min_row=2):
                 if i < 3:
-                    topology_name_cell = row[0]
 
                     ro_cell = row[5]
 
-                    mcdm_pp_cell = row[7]
-                    mcdm_yen_cell = row[9]
-                    # mcdm_mtr_yen_cell = row[11]
+                    wpm_pp_cell = row[7]
+                    wpm_yen_cell = row[9]
                     lwr_pp_cell = row[11]
                     lwr_yen_cell = row[13]
                     cwr_pp_cell = row[15]
                     cwr_yen_cell = row[17]
-                    # lwr_mtr_yen_cell = row[21]
-                    # lwr_mtr_pp_cell = row[23]
-                    # cwr_mtr_yen_cell = row[25]
-                    # cwr_mtr_pp_cell = row[27]
-                    # mtr_v1_yen_cell = row[29]
+                    lwr_cwr_pp_cell = row[19]
+                    lwr_cwr_yen_cell = row[21]
 
                     ro_cell_value = float(ro_cell.value)
 
                     cell_value_dict = dict()
 
-                    cell_value_dict[mcdm_pp_cell] = float(mcdm_pp_cell.value)
-                    cell_value_dict[mcdm_yen_cell] = float(mcdm_yen_cell.value)
-                    # cell_value_dict[mcdm_mtr_yen_cell] = float(mcdm_mtr_yen_cell.value)
+                    cell_value_dict[wpm_pp_cell] = float(wpm_pp_cell.value)
+                    cell_value_dict[wpm_yen_cell] = float(wpm_yen_cell.value)
                     cell_value_dict[lwr_pp_cell] = float(lwr_pp_cell.value)
                     cell_value_dict[lwr_yen_cell] = float(lwr_yen_cell.value)
                     cell_value_dict[cwr_pp_cell] = float(cwr_pp_cell.value)
                     cell_value_dict[cwr_yen_cell] = float(cwr_yen_cell.value)
-                    # cell_value_dict[lwr_mtr_yen_cell] = float(lwr_mtr_yen_cell.value)
-                    # cell_value_dict[lwr_mtr_pp_cell] = float(lwr_mtr_pp_cell.value)
-                    # cell_value_dict[cwr_mtr_yen_cell] = float(cwr_mtr_yen_cell.value)
-                    # cell_value_dict[cwr_mtr_pp_cell] = float(cwr_mtr_pp_cell.value)
-                    # cell_value_dict[mtr_v1_yen_cell] = float(mtr_v1_yen_cell.value)
-
-                    if logger.isEnabledFor(logging.DEBUG):
-                        logging.debug(f"{sheet.title} {topology_name_cell.value} ro_cell {ro_cell_value}")
-                        logging.debug(f"{sheet.title} {topology_name_cell.value} mcdm_pp_cell {mcdm_pp_cell.value}")
-                        logging.debug(f"{sheet.title} {topology_name_cell.value} mcdm_yen_cell {mcdm_yen_cell.value}")
-                        # logging.debug(f"{sheet.title} {topology_name_cell.value} mcdm_mtr_yen_cell {mcdm_mtr_yen_cell.value}")
-                        logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_pp_cell {lwr_pp_cell.value}")
-                        logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_yen_cell {lwr_yen_cell.value}")
-                        logging.debug(f"{sheet.title} {topology_name_cell.value} cwr_pp_cell {cwr_pp_cell.value}")
-                        logging.debug(f"{sheet.title} {topology_name_cell.value} cwr_yen_cell {cwr_yen_cell.value}")
-                        # logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_mtr_yen_cell {lwr_mtr_yen_cell.value}")
-                        # logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_mtr_pp_cell {lwr_mtr_pp_cell.value}")
-                        # logging.debug(f"{sheet.title} {topology_name_cell.value} cwr_mtr_yen_cell {cwr_mtr_yen_cell.value}")
-                        # logging.debug(f"{sheet.title} {topology_name_cell.value} cwr_mtr_pp_cell {cwr_mtr_pp_cell.value}")
-                        # logging.debug(f"{sheet.title} {topology_name_cell.value} mtr_v1_pp_cell {mtr_v1_yen_cell.value}")
+                    cell_value_dict[lwr_cwr_pp_cell] = float(lwr_cwr_pp_cell.value)
+                    cell_value_dict[lwr_cwr_yen_cell] = float(lwr_cwr_yen_cell.value)
 
                     min_value_keys_dict = find_min_value_keys(cell_value_dict)
 
@@ -300,111 +354,67 @@ def paint_cells(green_fill, yellow_fill, red_fill, workbook):
 
                     ip_col = 2
                     if ro_cell_value != 0:
-                        sheet.cell(row=1, column=17 + ip_col, value="ip_lwr_pp")
+                        sheet.cell(row=1, column=21 + ip_col, value="ip_lwr_pp")
                         ip_lwr_pp = ((ro_cell_value - lwr_pp_cell.value) * 100) / ro_cell_value
-                        sheet.cell(row=j, column=17 + ip_col, value=float(ip_lwr_pp))
+                        sheet.cell(row=j, column=21 + ip_col, value=float(ip_lwr_pp))
 
                         ip_col += 1
 
-                        sheet.cell(row=1, column=17 + ip_col, value="ip_lwr_yen")
+                        sheet.cell(row=1, column=21 + ip_col, value="ip_lwr_yen")
                         ip_lwr_yen = ((ro_cell_value - lwr_yen_cell.value) * 100) / ro_cell_value
-                        sheet.cell(row=j, column=17 + ip_col, value=float(ip_lwr_yen))
+                        sheet.cell(row=j, column=21 + ip_col, value=float(ip_lwr_yen))
 
                         ip_col += 1
 
-                        sheet.cell(row=1, column=17 + ip_col, value="ip_cwr_pp")
+                        sheet.cell(row=1, column=21 + ip_col, value="ip_cwr_pp")
                         ip_cwr_pp = ((ro_cell_value - cwr_pp_cell.value) * 100) / ro_cell_value
-                        sheet.cell(row=j, column=17 + ip_col, value=float(ip_cwr_pp))
+                        sheet.cell(row=j, column=21 + ip_col, value=float(ip_cwr_pp))
 
                         ip_col += 1
 
-                        sheet.cell(row=1, column=17 + ip_col, value="ip_cwr_yen")
+                        sheet.cell(row=1, column=21 + ip_col, value="ip_cwr_yen")
                         ip_cwr_yen = ((ro_cell_value - cwr_yen_cell.value) * 100) / ro_cell_value
-                        sheet.cell(row=j, column=17 + ip_col, value=float(ip_cwr_yen))
+                        sheet.cell(row=j, column=21 + ip_col, value=float(ip_cwr_yen))
 
-                        # ip_col += 1
-                        #
-                        # sheet.cell(row=1, column=29 + ip_col, value="ip_lwr_mtr_yen")
-                        # ip_lwr_mtr_yen = ((ro_cell_value - lwr_mtr_yen_cell.value) * 100) / ro_cell_value
-                        # sheet.cell(row=j, column=29 + ip_col, value=float(ip_lwr_mtr_yen))
-                        #
-                        # ip_col += 1
-                        #
-                        # sheet.cell(row=1, column=29 + ip_col, value="ip_lwr_mtr_pp")
-                        # ip_lwr_mtr_pp = ((ro_cell_value - lwr_mtr_pp_cell.value) * 100) / ro_cell_value
-                        # sheet.cell(row=j, column=29 + ip_col, value=float(ip_lwr_mtr_pp))
-                        #
-                        # ip_col += 1
-                        #
-                        # sheet.cell(row=1, column=29 + ip_col, value="ip_cwr_mtr_yen")
-                        # ip_cwr_mtr_yen = ((ro_cell_value - cwr_mtr_yen_cell.value) * 100) / ro_cell_value
-                        # sheet.cell(row=j, column=29 + ip_col, value=float(ip_cwr_mtr_yen))
-                        #
-                        # ip_col += 1
-                        #
-                        # sheet.cell(row=1, column=29 + ip_col, value="ip_cwr_mtr_pp")
-                        # ip_cwr_mtr_pp = ((ro_cell_value - cwr_mtr_pp_cell.value) * 100) / ro_cell_value
-                        # sheet.cell(row=j, column=29 + ip_col, value=float(ip_cwr_mtr_pp))
-                        #
-                        # ip_col += 1
-                        #
-                        # sheet.cell(row=1, column=29 + ip_col, value="ip_mtr_v1_yen")
-                        # ip_mtr_v1_yen = ((ro_cell_value - mtr_v1_yen_cell.value) * 100) / ro_cell_value
-                        # sheet.cell(row=j, column=29 + ip_col, value=float(ip_mtr_v1_yen))
-                        #
-                        # ip_col += 1
+                        ip_col += 1
+
+                        sheet.cell(row=1, column=21 + ip_col, value="ip_lwr_cwr_pp")
+                        ip_lwr_cwr_pp = ((ro_cell_value - lwr_cwr_pp_cell.value) * 100) / ro_cell_value
+                        sheet.cell(row=j, column=21 + ip_col, value=float(ip_lwr_cwr_pp))
+
+                        ip_col += 1
+
+                        sheet.cell(row=1, column=21 + ip_col, value="ip_lwr_cwr_yen")
+                        ip_lwr_cwr_yen = ((ro_cell_value - lwr_cwr_yen_cell.value) * 100) / ro_cell_value
+                        sheet.cell(row=j, column=21 + ip_col, value=float(ip_lwr_cwr_yen))
 
                     j += 1
 
                 else:
-                    topology_name_cell = row[0]
 
                     ro_cell = row[3]
 
-                    mcdm_pp_cell = row[5]
-                    mcdm_yen_cell = row[7]
-                    # mcdm_mtr_yen_cell = row[9]
+                    wpm_pp_cell = row[5]
+                    wpm_yen_cell = row[7]
                     lwr_pp_cell = row[9]
                     lwr_yen_cell = row[11]
                     cwr_pp_cell = row[13]
                     cwr_yen_cell = row[15]
-                    # lwr_mtr_yen_cell = row[19]
-                    # lwr_mtr_pp_cell = row[21]
-                    # cwr_mtr_yen_cell = row[23]
-                    # cwr_mtr_pp_cell = row[25]
-                    # mtr_v1_yen_cell = row[27]
+                    lwr_cwr_pp_cell = row[17]
+                    lwr_cwr_yen_cell = row[19]
 
                     ro_cell_value = float(ro_cell.value)
 
                     cell_value_dict = dict()
 
-                    cell_value_dict[mcdm_pp_cell] = float(mcdm_pp_cell.value)
-                    cell_value_dict[mcdm_yen_cell] = float(mcdm_yen_cell.value)
-                    # cell_value_dict[mcdm_mtr_yen_cell] = float(mcdm_mtr_yen_cell.value)
+                    cell_value_dict[wpm_pp_cell] = float(wpm_pp_cell.value)
+                    cell_value_dict[wpm_yen_cell] = float(wpm_yen_cell.value)
                     cell_value_dict[lwr_pp_cell] = float(lwr_pp_cell.value)
                     cell_value_dict[lwr_yen_cell] = float(lwr_yen_cell.value)
                     cell_value_dict[cwr_pp_cell] = float(cwr_pp_cell.value)
                     cell_value_dict[cwr_yen_cell] = float(cwr_yen_cell.value)
-                    # cell_value_dict[lwr_mtr_yen_cell] = float(lwr_mtr_yen_cell.value)
-                    # cell_value_dict[lwr_mtr_pp_cell] = float(lwr_mtr_pp_cell.value)
-                    # cell_value_dict[cwr_mtr_yen_cell] = float(cwr_mtr_yen_cell.value)
-                    # cell_value_dict[cwr_mtr_pp_cell] = float(cwr_mtr_pp_cell.value)
-                    # cell_value_dict[mtr_v1_yen_cell] = float(mtr_v1_yen_cell.value)
-
-                    if logger.isEnabledFor(logging.DEBUG):
-                        logging.debug(f"{sheet.title} {topology_name_cell.value} ro_cell {ro_cell_value}")
-                        logging.debug(f"{sheet.title} {topology_name_cell.value} mcdm_pp_cell {mcdm_pp_cell.value}")
-                        logging.debug(f"{sheet.title} {topology_name_cell.value} mcdm_yen_cell {mcdm_yen_cell.value}")
-                        # logging.debug(f"{sheet.title} {topology_name_cell.value} mcdm_mtr_yen_cell {mcdm_mtr_yen_cell.value}")
-                        logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_pp_cell {lwr_pp_cell.value}")
-                        logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_yen_cell {lwr_yen_cell.value}")
-                        logging.debug(f"{sheet.title} {topology_name_cell.value} cwr_pp_cell {cwr_pp_cell.value}")
-                        logging.debug(f"{sheet.title} {topology_name_cell.value} cwr_yen_cell {cwr_yen_cell.value}")
-                        # logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_mtr_yen_cell {lwr_mtr_yen_cell.value}")
-                        # logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_mtr_pp_cell {lwr_mtr_pp_cell.value}")
-                        # logging.debug(f"{sheet.title} {topology_name_cell.value} cwr_mtr_yen_cell {cwr_mtr_yen_cell.value}")
-                        # logging.debug(f"{sheet.title} {topology_name_cell.value} cwr_mtr_pp_cell {cwr_mtr_pp_cell.value}")
-                        # logging.debug(f"{sheet.title} {topology_name_cell.value} mtr_v1_pp_cell {mtr_v1_yen_cell.value}")
+                    cell_value_dict[lwr_cwr_pp_cell] = float(lwr_cwr_pp_cell.value)
+                    cell_value_dict[lwr_cwr_yen_cell] = float(lwr_cwr_yen_cell.value)
 
                     min_value_keys_dict = find_min_value_keys(cell_value_dict)
 
@@ -418,59 +428,39 @@ def paint_cells(green_fill, yellow_fill, red_fill, workbook):
 
                     ip_col = 2
                     if ro_cell_value != 0:
-                        sheet.cell(row=1, column=15 + ip_col, value="ip_lwr_pp")
+                        sheet.cell(row=1, column=19 + ip_col, value="ip_lwr_pp")
                         ip_lwr_pp = ((ro_cell_value - lwr_pp_cell.value) * 100) / ro_cell_value
-                        sheet.cell(row=j, column=15 + ip_col, value=float(ip_lwr_pp))
+                        sheet.cell(row=j, column=19 + ip_col, value=float(ip_lwr_pp))
 
                         ip_col += 1
 
-                        sheet.cell(row=1, column=15 + ip_col, value="ip_lwr_yen")
+                        sheet.cell(row=1, column=19 + ip_col, value="ip_lwr_yen")
                         ip_lwr_yen = ((ro_cell_value - lwr_yen_cell.value) * 100) / ro_cell_value
-                        sheet.cell(row=j, column=15 + ip_col, value=float(ip_lwr_yen))
+                        sheet.cell(row=j, column=19 + ip_col, value=float(ip_lwr_yen))
 
                         ip_col += 1
 
-                        sheet.cell(row=1, column=15 + ip_col, value="ip_cwr_pp")
+                        sheet.cell(row=1, column=19 + ip_col, value="ip_cwr_pp")
                         ip_cwr_pp = ((ro_cell_value - cwr_pp_cell.value) * 100) / ro_cell_value
-                        sheet.cell(row=j, column=15 + ip_col, value=float(ip_cwr_pp))
+                        sheet.cell(row=j, column=19 + ip_col, value=float(ip_cwr_pp))
 
                         ip_col += 1
 
-                        sheet.cell(row=1, column=15 + ip_col, value="ip_cwr_yen")
+                        sheet.cell(row=1, column=19 + ip_col, value="ip_cwr_yen")
                         ip_cwr_yen = ((ro_cell_value - cwr_yen_cell.value) * 100) / ro_cell_value
-                        sheet.cell(row=j, column=15 + ip_col, value=float(ip_cwr_yen))
+                        sheet.cell(row=j, column=19 + ip_col, value=float(ip_cwr_yen))
 
-                        # ip_col += 1
-                        #
-                        # sheet.cell(row=1, column=27 + ip_col, value="ip_lwr_mtr_yen")
-                        # ip_lwr_mtr_yen = ((ro_cell_value - lwr_mtr_yen_cell.value) * 100) / ro_cell_value
-                        # sheet.cell(row=j, column=27 + ip_col, value=float(ip_lwr_mtr_yen))
-                        #
-                        # ip_col += 1
-                        #
-                        # sheet.cell(row=1, column=27 + ip_col, value="ip_lwr_mtr_pp")
-                        # ip_lwr_mtr_pp = ((ro_cell_value - lwr_mtr_pp_cell.value) * 100) / ro_cell_value
-                        # sheet.cell(row=j, column=27 + ip_col, value=float(ip_lwr_mtr_pp))
-                        #
-                        # ip_col += 1
-                        #
-                        # sheet.cell(row=1, column=27 + ip_col, value="ip_cwr_mtr_yen")
-                        # ip_cwr_mtr_yen = ((ro_cell_value - cwr_mtr_yen_cell.value) * 100) / ro_cell_value
-                        # sheet.cell(row=j, column=27 + ip_col, value=float(ip_cwr_mtr_yen))
-                        #
-                        # ip_col += 1
-                        #
-                        # sheet.cell(row=1, column=27 + ip_col, value="ip_cwr_mtr_pp")
-                        # ip_cwr_mtr_pp = ((ro_cell_value - cwr_mtr_pp_cell.value) * 100) / ro_cell_value
-                        # sheet.cell(row=j, column=27 + ip_col, value=float(ip_cwr_mtr_pp))
-                        #
-                        # ip_col += 1
-                        #
-                        # sheet.cell(row=1, column=27 + ip_col, value="ip_mtr_v1_yen")
-                        # ip_mtr_v1_yen = ((ro_cell_value - mtr_v1_yen_cell.value) * 100) / ro_cell_value
-                        # sheet.cell(row=j, column=27 + ip_col, value=float(ip_mtr_v1_yen))
-                        #
-                        # ip_col += 1
+                        ip_col += 1
+
+                        sheet.cell(row=1, column=19 + ip_col, value="ip_lwr_cwr_pp")
+                        ip_lwr_cwr_pp = ((ro_cell_value - lwr_cwr_pp_cell.value) * 100) / ro_cell_value
+                        sheet.cell(row=j, column=19 + ip_col, value=float(ip_lwr_cwr_pp))
+
+                        ip_col += 1
+
+                        sheet.cell(row=1, column=19 + ip_col, value="ip_lwr_cwr_yen")
+                        ip_lwr_cwr_yen = ((ro_cell_value - lwr_cwr_yen_cell.value) * 100) / ro_cell_value
+                        sheet.cell(row=j, column=19 + ip_col, value=float(ip_lwr_cwr_yen))
 
                     j += 1
 
@@ -479,309 +469,15 @@ def paint_cells(green_fill, yellow_fill, red_fill, workbook):
         if "O2-O3-K" in sheet.title:
             for row in sheet.iter_rows(min_row=2):
                 pass
-                # if i < 3:
-                #     topology_name_cell = row[0]
-                #
-                #     ro_cell = row[8]
-                #
-                #     mcdm_pp_cell = row[11]
-                #     mcdm_yen_cell = row[14]
-                #     mcdm_mtr_yen_cell = row[17]
-                #     lwr_pp_cell = row[17]
-                #     lwr_yen_cell = row[20]
-                #     cwr_pp_cell = row[23]
-                #     cwr_yen_cell = row[26]
-                #     lwr_mtr_yen_cell = row[29]
-                #
-                #     ro_cell_value = float(ro_cell.value)
-                #
-                #     cell_value_dict = dict()
-                #
-                #     cell_value_dict[mcdm_pp_cell] = float(mcdm_pp_cell.value)
-                #     cell_value_dict[mcdm_yen_cell] = float(mcdm_yen_cell.value)
-                #     cell_value_dict[mcdm_mtr_yen_cell] = float(mcdm_mtr_yen_cell.value)
-                #     cell_value_dict[lwr_pp_cell] = float(lwr_pp_cell.value)
-                #     cell_value_dict[lwr_yen_cell] = float(lwr_yen_cell.value)
-                #     cell_value_dict[cwr_pp_cell] = float(cwr_pp_cell.value)
-                #     cell_value_dict[cwr_yen_cell] = float(cwr_yen_cell.value)
-                #     cell_value_dict[lwr_mtr_yen_cell] = float(lwr_mtr_yen_cell.value)
-                #
-                #     if logger.isEnabledFor(logging.DEBUG):
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} ro_cell {ro_cell_value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} mcdm_pp_cell {mcdm_pp_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} mcdm_yen_cell {mcdm_yen_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} mcdm_mtr_yen_cell {mcdm_mtr_yen_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_pp_cell {lwr_pp_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_yen_cell {lwr_yen_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} cwr_pp_cell {cwr_pp_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} cwr_yen_cell {cwr_yen_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_mtr_yen_cell {lwr_mtr_yen_cell.value}")
-                #
-                #     min_value_keys_dict = find_min_value_keys(cell_value_dict)
-                #
-                #     for key, value in min_value_keys_dict.items():
-                #         if value < ro_cell_value:
-                #             key.fill = green_fill
-                #         elif value == ro_cell_value:
-                #             key.fill = yellow_fill
-                #         else:
-                #             key.fill = red_fill
-                #
-                # else:
-                #     topology_name_cell = row[0]
-                #
-                #     ro_cell = row[5]
-                #
-                #     mcdm_pp_cell = row[8]
-                #     mcdm_yen_cell = row[11]
-                #     mcdm_mtr_yen_cell = row[14]
-                #     lwr_pp_cell = row[17]
-                #     lwr_yen_cell = row[20]
-                #     cwr_pp_cell = row[23]
-                #     cwr_yen_cell = row[26]
-                #     lwr_mtr_yen_cell = row[29]
-                #
-                #     ro_cell_value = float(ro_cell.value)
-                #
-                #     cell_value_dict = dict()
-                #
-                #     cell_value_dict[mcdm_pp_cell] = float(mcdm_pp_cell.value)
-                #     cell_value_dict[mcdm_yen_cell] = float(mcdm_yen_cell.value)
-                #     cell_value_dict[mcdm_mtr_yen_cell] = float(mcdm_mtr_yen_cell.value)
-                #     cell_value_dict[lwr_pp_cell] = float(lwr_pp_cell.value)
-                #     cell_value_dict[lwr_yen_cell] = float(lwr_yen_cell.value)
-                #     cell_value_dict[cwr_pp_cell] = float(cwr_pp_cell.value)
-                #     cell_value_dict[cwr_yen_cell] = float(cwr_yen_cell.value)
-                #     cell_value_dict[lwr_mtr_yen_cell] = float(lwr_mtr_yen_cell.value)
-                #
-                #     if logger.isEnabledFor(logging.DEBUG):
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} ro_cell {ro_cell_value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} mcdm_pp_cell {mcdm_pp_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} mcdm_yen_cell {mcdm_yen_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} mcdm_mtr_yen_cell {mcdm_mtr_yen_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_pp_cell {lwr_pp_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_yen_cell {lwr_yen_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} cwr_pp_cell {cwr_pp_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} cwr_yen_cell {cwr_yen_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_mtr_yen_cell {lwr_mtr_yen_cell.value}")
-                #
-                #     min_value_keys_dict = find_min_value_keys(cell_value_dict)
-                #
-                #     for key, value in min_value_keys_dict.items():
-                #         if value < ro_cell_value:
-                #             key.fill = green_fill
-                #         elif value == ro_cell_value:
-                #             key.fill = yellow_fill
-                #         else:
-                #             key.fill = red_fill
             i += 1
 
         if "U-T-K" in sheet.title:
             for row in sheet.iter_rows(min_row=2):
                 pass
-                # if i < 3:
-                #     topology_name_cell = row[0]
-                #
-                #     ro_max_util_cell = row[7]
-                #     ro_time_cell = row[8]
-                #
-                #     mcdm_max_util_pp_cell = row[10]
-                #     mcdm_time_pp_cell = row[11]
-                #
-                #     mcdm_max_util_yen_cell = row[13]
-                #     mcdm_time_yen_cell = row[14]
-                #
-                #     mcdm_max_util_mtr_yen_cell = row[16]
-                #     mcdm_time_mtr_yen_cell = row[17]
-                #
-                #     lwr_max_util_pp_cell = row[19]
-                #     lwr_time_pp_cell = row[20]
-                #
-                #     lwr_max_util_yen_cell = row[22]
-                #     lwr_time_yen_cell = row[23]
-                #
-                #     cwr_max_util_pp_cell = row[19]
-                #     cwr_time_pp_cell = row[20]
-                #
-                #     cwr_max_util_yen_cell = row[22]
-                #     cwr_time_yen_cell = row[23]
-                #
-                #     lwr_max_util_mtr_yen_cell = row[25]
-                #     lwr_time_mtr_yen_cell = row[26]
-                #
-                #     max_util_cell_value_dict = dict()
-                #
-                #     max_util_cell_value_dict[mcdm_max_util_pp_cell] = float(mcdm_max_util_pp_cell.value)
-                #     max_util_cell_value_dict[mcdm_max_util_yen_cell] = float(mcdm_max_util_yen_cell.value)
-                #     max_util_cell_value_dict[mcdm_max_util_mtr_yen_cell] = float(mcdm_max_util_mtr_yen_cell.value)
-                #     max_util_cell_value_dict[lwr_max_util_pp_cell] = float(lwr_max_util_pp_cell.value)
-                #     max_util_cell_value_dict[lwr_max_util_yen_cell] = float(lwr_max_util_yen_cell.value)
-                #     max_util_cell_value_dict[cwr_max_util_pp_cell] = float(cwr_max_util_pp_cell.value)
-                #     max_util_cell_value_dict[cwr_max_util_yen_cell] = float(cwr_max_util_yen_cell.value)
-                #     max_util_cell_value_dict[lwr_max_util_mtr_yen_cell] = float(lwr_max_util_mtr_yen_cell.value)
-                #
-                #     min_value_keys_dict = find_min_value_keys(max_util_cell_value_dict)
-                #
-                #     for key, value in min_value_keys_dict.items():
-                #         if value < float(ro_max_util_cell.value):
-                #             key.fill = green_fill
-                #         elif value == float(ro_max_util_cell.value):
-                #             key.fill = yellow_fill
-                #         else:
-                #             key.fill = red_fill
-                #
-                #     time_cell_value_dict = dict()
-                #
-                #     time_cell_value_dict[mcdm_time_pp_cell] = float(mcdm_time_pp_cell.value)
-                #     time_cell_value_dict[mcdm_time_yen_cell] = float(mcdm_time_yen_cell.value)
-                #     time_cell_value_dict[mcdm_time_mtr_yen_cell] = float(mcdm_time_mtr_yen_cell.value)
-                #     time_cell_value_dict[lwr_time_pp_cell] = float(lwr_time_pp_cell.value)
-                #     time_cell_value_dict[lwr_time_yen_cell] = float(lwr_time_yen_cell.value)
-                #     time_cell_value_dict[cwr_time_pp_cell] = float(cwr_time_pp_cell.value)
-                #     time_cell_value_dict[cwr_time_yen_cell] = float(cwr_time_yen_cell.value)
-                #     time_cell_value_dict[lwr_time_mtr_yen_cell] = float(lwr_time_mtr_yen_cell.value)
-                #
-                #     min_value_keys_dict = find_min_value_keys(time_cell_value_dict)
-                #
-                #     for key, value in min_value_keys_dict.items():
-                #         if value < float(ro_time_cell.value):
-                #             key.fill = green_fill
-                #         elif value == float(ro_time_cell.value):
-                #             key.fill = yellow_fill
-                #         else:
-                #             key.fill = red_fill
-                #
-                #     if logger.isEnabledFor(logging.DEBUG):
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} ro_max_util_cell {ro_max_util_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} ro_time_cell {ro_time_cell.value}")
-                #
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} mcdm_max_util_pp_cell {mcdm_max_util_pp_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} mcdm_time_pp_cell {mcdm_time_pp_cell.value}")
-                #
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} mcdm_max_util_yen_cell {mcdm_max_util_yen_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} mcdm_time_yen_cell {mcdm_time_yen_cell.value}")
-                #
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} mcdm_max_util_mtr_yen_cell {mcdm_max_util_mtr_yen_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} mcdm_time_mtr_yen_cell {mcdm_time_mtr_yen_cell.value}")
-                #
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_max_util_pp_cell {lwr_max_util_pp_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_time_pp_cell {lwr_time_pp_cell.value}")
-                #
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_max_util_yen_cell {lwr_max_util_yen_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_time_yen_cell {lwr_time_yen_cell.value}")
-                #
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} cwr_max_util_pp_cell {cwr_max_util_pp_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} cwr_time_pp_cell {cwr_time_pp_cell.value}")
-                #
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} cwr_max_util_yen_cell {cwr_max_util_pp_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} cwr_time_yen_cell {cwr_time_pp_cell.value}")
-                #
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_max_util_mtr_yen_cell {lwr_max_util_mtr_yen_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_time_mtr_yen_cell {lwr_time_mtr_yen_cell.value}")
-                #
-                # else:
-                #     topology_name_cell = row[0]
-                #
-                #     ro_max_util_cell = row[4]
-                #     ro_time_cell = row[5]
-                #
-                #     mcdm_max_util_pp_cell = row[7]
-                #     mcdm_time_pp_cell = row[8]
-                #
-                #     mcdm_max_util_yen_cell = row[10]
-                #     mcdm_time_yen_cell = row[11]
-                #
-                #     mcdm_max_util_mtr_yen_cell = row[13]
-                #     mcdm_time_mtr_yen_cell = row[14]
-                #
-                #     lwr_max_util_pp_cell = row[16]
-                #     lwr_time_pp_cell = row[17]
-                #
-                #     lwr_max_util_yen_cell = row[19]
-                #     lwr_time_yen_cell = row[20]
-                #
-                #     cwr_max_util_pp_cell = row[16]
-                #     cwr_time_pp_cell = row[17]
-                #
-                #     cwr_max_util_yen_cell = row[19]
-                #     cwr_time_yen_cell = row[20]
-                #
-                #     lwr_max_util_mtr_yen_cell = row[22]
-                #     lwr_time_mtr_yen_cell = row[23]
-                #
-                #     max_util_cell_value_dict = dict()
-                #
-                #     max_util_cell_value_dict[mcdm_max_util_pp_cell] = float(mcdm_max_util_pp_cell.value)
-                #     max_util_cell_value_dict[mcdm_max_util_yen_cell] = float(mcdm_max_util_yen_cell.value)
-                #     max_util_cell_value_dict[mcdm_max_util_mtr_yen_cell] = float(mcdm_max_util_mtr_yen_cell.value)
-                #     max_util_cell_value_dict[lwr_max_util_pp_cell] = float(lwr_max_util_pp_cell.value)
-                #     max_util_cell_value_dict[lwr_max_util_yen_cell] = float(lwr_max_util_yen_cell.value)
-                #     max_util_cell_value_dict[cwr_max_util_pp_cell] = float(cwr_max_util_pp_cell.value)
-                #     max_util_cell_value_dict[cwr_max_util_yen_cell] = float(cwr_max_util_yen_cell.value)
-                #     max_util_cell_value_dict[lwr_max_util_mtr_yen_cell] = float(lwr_max_util_mtr_yen_cell.value)
-                #
-                #     min_value_keys_dict = find_min_value_keys(max_util_cell_value_dict)
-                #
-                #     for key, value in min_value_keys_dict.items():
-                #         if value < float(ro_max_util_cell.value):
-                #             key.fill = green_fill
-                #         elif value == float(ro_max_util_cell.value):
-                #             key.fill = yellow_fill
-                #         else:
-                #             key.fill = red_fill
-                #
-                #     time_cell_value_dict = dict()
-                #
-                #     time_cell_value_dict[mcdm_time_pp_cell] = float(mcdm_time_pp_cell.value)
-                #     time_cell_value_dict[mcdm_time_yen_cell] = float(mcdm_time_yen_cell.value)
-                #     time_cell_value_dict[mcdm_time_mtr_yen_cell] = float(mcdm_time_mtr_yen_cell.value)
-                #     time_cell_value_dict[lwr_time_pp_cell] = float(lwr_time_pp_cell.value)
-                #     time_cell_value_dict[lwr_time_yen_cell] = float(lwr_time_yen_cell.value)
-                #     time_cell_value_dict[cwr_time_pp_cell] = float(cwr_time_pp_cell.value)
-                #     time_cell_value_dict[cwr_time_yen_cell] = float(cwr_time_yen_cell.value)
-                #     time_cell_value_dict[lwr_time_mtr_yen_cell] = float(lwr_time_mtr_yen_cell.value)
-                #
-                #     min_value_keys_dict = find_min_value_keys(time_cell_value_dict)
-                #
-                #     for key, value in min_value_keys_dict.items():
-                #         if value < float(ro_time_cell.value):
-                #             key.fill = green_fill
-                #         elif value == float(ro_time_cell.value):
-                #             key.fill = yellow_fill
-                #         else:
-                #             key.fill = red_fill
-                #
-                #     if logger.isEnabledFor(logging.DEBUG):
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} ro_max_util_cell {ro_max_util_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} ro_time_cell {ro_time_cell.value}")
-                #
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} mcdm_max_util_pp_cell {mcdm_max_util_pp_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} mcdm_time_pp_cell {mcdm_time_pp_cell.value}")
-                #
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} mcdm_max_util_yen_cell {mcdm_max_util_yen_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} mcdm_time_yen_cell {mcdm_time_yen_cell.value}")
-                #
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} mcdm_max_util_mtr_yen_cell {mcdm_max_util_mtr_yen_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} mcdm_time_mtr_yen_cell {mcdm_time_mtr_yen_cell.value}")
-                #
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_max_util_pp_cell {lwr_max_util_pp_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_time_pp_cell {lwr_time_pp_cell.value}")
-                #
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_max_util_yen_cell {lwr_max_util_yen_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_time_yen_cell {lwr_time_yen_cell.value}")
-                #
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} cwr_max_util_pp_cell {cwr_max_util_pp_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} cwr_time_pp_cell {cwr_time_pp_cell.value}")
-                #
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} cwr_max_util_yen_cell {cwr_max_util_pp_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} cwr_time_yen_cell {cwr_time_pp_cell.value}")
-                #
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_max_util_mtr_yen_cell {lwr_max_util_mtr_yen_cell.value}")
-                #         logging.debug(f"{sheet.title} {topology_name_cell.value} lwr_time_mtr_yen_cell {lwr_time_mtr_yen_cell.value}")
 
             i += 1
 
-    workbook.save("outputs_colored.xlsx")
+    workbook.save("output_v2_relative_colored.xlsx")
 
 
 def main():
@@ -791,33 +487,62 @@ def main():
 
     wb = openpyxl.Workbook()
 
-    project = "tsncf-for_article"
+    project = "tsn-simulation"
 
-    algorithm_aliases = dict()
+    algorithm_alias_dict = {"shortestPath_dijkstra": "Dijkstra",
+                            "yen_U": "KSPU",
 
-    algorithm_aliases["shortestpath_dijkstra"] = "Dijkstra"
-    algorithm_aliases["U_yen"] = "KSPU"
-    algorithm_aliases["GRASP_yen"] = "RO"
-    algorithm_aliases["WSM_pp"] = "WSM_pp"
-    algorithm_aliases["WSM_yen"] = "WSM_yen"
-    # algorithm_aliases["CD_v1c_yen"] = "MCDM_mtr_yen"
-    algorithm_aliases["GRASPCD_pp"] = "LWR_pp"
-    algorithm_aliases["GRASPCD_yen"] = "LWR_yen"
-    algorithm_aliases["GRASPRandomCD_pp"] = "CWR_pp"
-    algorithm_aliases["GRASPRandomCD_yen"] = "CWR_yen"
-    # algorithm_aliases["GRASPCD_v1c_yen"] = "LWR_mtr_yen"
-    # algorithm_aliases["GRASPCD_v1c_pp"] = "LWR_mtr_pp"
-    # algorithm_aliases["GRASPRandomCD_v1c_yen"] = "CWR_mtr_yen"
-    # algorithm_aliases["GRASPRandomCD_v1c_pp"] = "CWR_mtr_pp"
-    # algorithm_aliases["GRASP_v1_yen"] = "mtr_v1_yen"
+                            "yen_GRASP": "RO",
 
-    sheets = ["O1-K", "O2-O3-K", "U-T-K"]
-    output_list = read_outputs(logger, project)
+                            "pathPenalization_WSM": "WSM_pp",
+                            "yen_WSM": "WSM_yen",
 
-    write_to_excel(wb, algorithm_aliases, sheets, output_list)
+                            "pathPenalization_WSMLWR": "WSM_LWR_pp",
+                            "yen_WSMLWR": "WSM_LWR_yen",
 
-    # workbook = load_workbook("output.xlsx")
-    #
+                            "pathPenalization_WSMCWR": "WSM_CWR_pp",
+                            "yen_WSMCWR": "WSM_CWR_yen",
+
+                            "pathPenalization_WSMLWRCWR": "WSM_LWR_CWR_pp",
+                            "yen_WSMLWRCWR": "WSM_LWR_CWR_yen",
+
+                            "pathPenalization_WPM_v1": "WPM_pp_v1",
+                            "pathPenalization_WPM_v2_actual": "WPM_pp_v2_actual",
+                            "pathPenalization_WPM_v2_relative": "WPM_pp_v2_relative",
+                            "yen_WPM_v1": "WPM_yen_v1",
+                            "yen_WPM_v2_actual": "WPM_yen_v2_actual",
+                            "yen_WPM_v2_relative": "WPM_yen_v2_relative",
+
+                            "pathPenalization_WPMLWR_v1": "LWR_pp_v1",
+                            "pathPenalization_WPMLWR_v2_actual": "LWR_pp_v2_actual",
+                            "pathPenalization_WPMLWR_v2_relative": "LWR_pp_v2_relative",
+                            "yen_WPMLWR_v1": "LWR_yen_v1",
+                            "yen_WPMLWR_v2_actual": "LWR_yen_v2_actual",
+                            "yen_WPMLWR_v2_relative": "LWR_yen_v2_relative",
+
+                            "pathPenalization_WPMCWR_v1": "CWR_pp_v1",
+                            "pathPenalization_WPMCWR_v2_actual": "CWR_pp_v2_actual",
+                            "pathPenalization_WPMCWR_v2_relative": "CWR_pp_v2_relative",
+                            "yen_WPMCWR_v1": "CWR_yen_v1",
+                            "yen_WPMCWR_v2_actual": "CWR_yen_v2_actual",
+                            "yen_WPMCWR_v2_relative": "CWR_yen_v2_relative",
+
+                            "pathPenalization_WPMLWRCWR_v1": "LWR_CWR_pp_v1",
+                            "pathPenalization_WPMLWRCWR_v2_actual": "LWR_CWR_pp_v2_actual",
+                            "pathPenalization_WPMLWRCWR_v2_relative": "LWR_CWR_pp_v2_relative",
+                            "yen_WPMLWRCWR_v1": "LWR_CWR_yen_v1",
+                            "yen_WPMLWRCWR_v2_actual": "LWR_CWR_yen_v2_actual",
+                            "yen_WPMLWRCWR_v2_relative": "LWR_CWR_yen_v2_relative",
+
+                            }
+
+    sheet_list = ["O1-K", "O2-O3-K", "AWCD-K", "MU-AU-V-T-K"]
+    output_list = read_output(project)
+
+    write_to_excel(wb, algorithm_alias_dict, sheet_list, output_list)
+
+    workbook = load_workbook("output_v2_relative.xlsx")
+
     # paint_cells(green_fill, yellow_fill, red_fill, workbook)
 
 
