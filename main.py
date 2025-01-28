@@ -326,8 +326,8 @@ def paint_cells(green_fill, yellow_fill, red_fill, workbook):
                     lwr_yen_cell = row[13]
                     cwr_pp_cell = row[15]
                     cwr_yen_cell = row[17]
-                    lwr_cwr_pp_cell = row[19]
-                    lwr_cwr_yen_cell = row[21]
+                    # lwr_cwr_pp_cell = row[19]
+                    # lwr_cwr_yen_cell = row[21]
 
                     ro_cell_value = float(ro_cell.value)
 
@@ -339,8 +339,8 @@ def paint_cells(green_fill, yellow_fill, red_fill, workbook):
                     cell_value_dict[lwr_yen_cell] = float(lwr_yen_cell.value)
                     cell_value_dict[cwr_pp_cell] = float(cwr_pp_cell.value)
                     cell_value_dict[cwr_yen_cell] = float(cwr_yen_cell.value)
-                    cell_value_dict[lwr_cwr_pp_cell] = float(lwr_cwr_pp_cell.value)
-                    cell_value_dict[lwr_cwr_yen_cell] = float(lwr_cwr_yen_cell.value)
+                    # cell_value_dict[lwr_cwr_pp_cell] = float(lwr_cwr_pp_cell.value)
+                    # cell_value_dict[lwr_cwr_yen_cell] = float(lwr_cwr_yen_cell.value)
 
                     min_value_keys_dict = find_min_value_keys(cell_value_dict)
 
@@ -354,39 +354,39 @@ def paint_cells(green_fill, yellow_fill, red_fill, workbook):
 
                     ip_col = 2
                     if ro_cell_value != 0:
-                        sheet.cell(row=1, column=21 + ip_col, value="ip_lwr_pp")
+                        sheet.cell(row=1, column=17 + ip_col, value="ip_lwr_pp")
                         ip_lwr_pp = ((ro_cell_value - lwr_pp_cell.value) * 100) / ro_cell_value
-                        sheet.cell(row=j, column=21 + ip_col, value=float(ip_lwr_pp))
+                        sheet.cell(row=j, column=17 + ip_col, value=float(ip_lwr_pp))
 
                         ip_col += 1
 
-                        sheet.cell(row=1, column=21 + ip_col, value="ip_lwr_yen")
+                        sheet.cell(row=1, column=17 + ip_col, value="ip_lwr_yen")
                         ip_lwr_yen = ((ro_cell_value - lwr_yen_cell.value) * 100) / ro_cell_value
-                        sheet.cell(row=j, column=21 + ip_col, value=float(ip_lwr_yen))
+                        sheet.cell(row=j, column=17 + ip_col, value=float(ip_lwr_yen))
 
                         ip_col += 1
 
-                        sheet.cell(row=1, column=21 + ip_col, value="ip_cwr_pp")
+                        sheet.cell(row=1, column=17 + ip_col, value="ip_cwr_pp")
                         ip_cwr_pp = ((ro_cell_value - cwr_pp_cell.value) * 100) / ro_cell_value
-                        sheet.cell(row=j, column=21 + ip_col, value=float(ip_cwr_pp))
+                        sheet.cell(row=j, column=17 + ip_col, value=float(ip_cwr_pp))
 
                         ip_col += 1
 
-                        sheet.cell(row=1, column=21 + ip_col, value="ip_cwr_yen")
+                        sheet.cell(row=1, column=17 + ip_col, value="ip_cwr_yen")
                         ip_cwr_yen = ((ro_cell_value - cwr_yen_cell.value) * 100) / ro_cell_value
-                        sheet.cell(row=j, column=21 + ip_col, value=float(ip_cwr_yen))
+                        sheet.cell(row=j, column=17 + ip_col, value=float(ip_cwr_yen))
 
-                        ip_col += 1
-
-                        sheet.cell(row=1, column=21 + ip_col, value="ip_lwr_cwr_pp")
-                        ip_lwr_cwr_pp = ((ro_cell_value - lwr_cwr_pp_cell.value) * 100) / ro_cell_value
-                        sheet.cell(row=j, column=21 + ip_col, value=float(ip_lwr_cwr_pp))
-
-                        ip_col += 1
-
-                        sheet.cell(row=1, column=21 + ip_col, value="ip_lwr_cwr_yen")
-                        ip_lwr_cwr_yen = ((ro_cell_value - lwr_cwr_yen_cell.value) * 100) / ro_cell_value
-                        sheet.cell(row=j, column=21 + ip_col, value=float(ip_lwr_cwr_yen))
+                        # ip_col += 1
+                        #
+                        # sheet.cell(row=1, column=17 + ip_col, value="ip_lwr_cwr_pp")
+                        # ip_lwr_cwr_pp = ((ro_cell_value - lwr_cwr_pp_cell.value) * 100) / ro_cell_value
+                        # sheet.cell(row=j, column=17 + ip_col, value=float(ip_lwr_cwr_pp))
+                        #
+                        # ip_col += 1
+                        #
+                        # sheet.cell(row=1, column=17 + ip_col, value="ip_lwr_cwr_yen")
+                        # ip_lwr_cwr_yen = ((ro_cell_value - lwr_cwr_yen_cell.value) * 100) / ro_cell_value
+                        # sheet.cell(row=j, column=17 + ip_col, value=float(ip_lwr_cwr_yen))
 
                     j += 1
 
@@ -400,8 +400,8 @@ def paint_cells(green_fill, yellow_fill, red_fill, workbook):
                     lwr_yen_cell = row[11]
                     cwr_pp_cell = row[13]
                     cwr_yen_cell = row[15]
-                    lwr_cwr_pp_cell = row[17]
-                    lwr_cwr_yen_cell = row[19]
+                    # lwr_cwr_pp_cell = row[17]
+                    # lwr_cwr_yen_cell = row[19]
 
                     ro_cell_value = float(ro_cell.value)
 
@@ -413,8 +413,8 @@ def paint_cells(green_fill, yellow_fill, red_fill, workbook):
                     cell_value_dict[lwr_yen_cell] = float(lwr_yen_cell.value)
                     cell_value_dict[cwr_pp_cell] = float(cwr_pp_cell.value)
                     cell_value_dict[cwr_yen_cell] = float(cwr_yen_cell.value)
-                    cell_value_dict[lwr_cwr_pp_cell] = float(lwr_cwr_pp_cell.value)
-                    cell_value_dict[lwr_cwr_yen_cell] = float(lwr_cwr_yen_cell.value)
+                    # cell_value_dict[lwr_cwr_pp_cell] = float(lwr_cwr_pp_cell.value)
+                    # cell_value_dict[lwr_cwr_yen_cell] = float(lwr_cwr_yen_cell.value)
 
                     min_value_keys_dict = find_min_value_keys(cell_value_dict)
 
@@ -428,56 +428,61 @@ def paint_cells(green_fill, yellow_fill, red_fill, workbook):
 
                     ip_col = 2
                     if ro_cell_value != 0:
-                        sheet.cell(row=1, column=19 + ip_col, value="ip_lwr_pp")
+                        sheet.cell(row=1, column=15 + ip_col, value="ip_lwr_pp")
                         ip_lwr_pp = ((ro_cell_value - lwr_pp_cell.value) * 100) / ro_cell_value
-                        sheet.cell(row=j, column=19 + ip_col, value=float(ip_lwr_pp))
+                        sheet.cell(row=j, column=15 + ip_col, value=float(ip_lwr_pp))
 
                         ip_col += 1
 
-                        sheet.cell(row=1, column=19 + ip_col, value="ip_lwr_yen")
+                        sheet.cell(row=1, column=15 + ip_col, value="ip_lwr_yen")
                         ip_lwr_yen = ((ro_cell_value - lwr_yen_cell.value) * 100) / ro_cell_value
-                        sheet.cell(row=j, column=19 + ip_col, value=float(ip_lwr_yen))
+                        sheet.cell(row=j, column=15 + ip_col, value=float(ip_lwr_yen))
 
                         ip_col += 1
 
-                        sheet.cell(row=1, column=19 + ip_col, value="ip_cwr_pp")
+                        sheet.cell(row=1, column=15 + ip_col, value="ip_cwr_pp")
                         ip_cwr_pp = ((ro_cell_value - cwr_pp_cell.value) * 100) / ro_cell_value
-                        sheet.cell(row=j, column=19 + ip_col, value=float(ip_cwr_pp))
+                        sheet.cell(row=j, column=15 + ip_col, value=float(ip_cwr_pp))
 
                         ip_col += 1
 
-                        sheet.cell(row=1, column=19 + ip_col, value="ip_cwr_yen")
+                        sheet.cell(row=1, column=15 + ip_col, value="ip_cwr_yen")
                         ip_cwr_yen = ((ro_cell_value - cwr_yen_cell.value) * 100) / ro_cell_value
-                        sheet.cell(row=j, column=19 + ip_col, value=float(ip_cwr_yen))
+                        sheet.cell(row=j, column=15 + ip_col, value=float(ip_cwr_yen))
 
-                        ip_col += 1
-
-                        sheet.cell(row=1, column=19 + ip_col, value="ip_lwr_cwr_pp")
-                        ip_lwr_cwr_pp = ((ro_cell_value - lwr_cwr_pp_cell.value) * 100) / ro_cell_value
-                        sheet.cell(row=j, column=19 + ip_col, value=float(ip_lwr_cwr_pp))
-
-                        ip_col += 1
-
-                        sheet.cell(row=1, column=19 + ip_col, value="ip_lwr_cwr_yen")
-                        ip_lwr_cwr_yen = ((ro_cell_value - lwr_cwr_yen_cell.value) * 100) / ro_cell_value
-                        sheet.cell(row=j, column=19 + ip_col, value=float(ip_lwr_cwr_yen))
+                        # ip_col += 1
+                        #
+                        # sheet.cell(row=1, column=15 + ip_col, value="ip_lwr_cwr_pp")
+                        # ip_lwr_cwr_pp = ((ro_cell_value - lwr_cwr_pp_cell.value) * 100) / ro_cell_value
+                        # sheet.cell(row=j, column=15 + ip_col, value=float(ip_lwr_cwr_pp))
+                        #
+                        # ip_col += 1
+                        #
+                        # sheet.cell(row=1, column=19 + ip_col, value="ip_lwr_cwr_yen")
+                        # ip_lwr_cwr_yen = ((ro_cell_value - lwr_cwr_yen_cell.value) * 100) / ro_cell_value
+                        # sheet.cell(row=j, column=19 + ip_col, value=float(ip_lwr_cwr_yen))
 
                     j += 1
 
             i += 1
 
-        if "O2-O3-K" in sheet.title:
+        elif "O2-O3-K" in sheet.title:
             for row in sheet.iter_rows(min_row=2):
                 pass
             i += 1
 
-        if "U-T-K" in sheet.title:
+        elif "AWCD-K" in sheet.title:
+            for row in sheet.iter_rows(min_row=2):
+                pass
+            i += 1
+
+        elif "MU-AU-V-T-K" in sheet.title:
             for row in sheet.iter_rows(min_row=2):
                 pass
 
             i += 1
 
-    workbook.save("output_v2_relative_colored.xlsx")
+    workbook.save("output_colored.xlsx")
 
 
 def main():
@@ -539,11 +544,11 @@ def main():
     sheet_list = ["O1-K", "O2-O3-K", "AWCD-K", "MU-AU-V-T-K"]
     output_list = read_output(project)
 
-    write_to_excel(wb, algorithm_alias_dict, sheet_list, output_list)
+    # write_to_excel(wb, algorithm_alias_dict, sheet_list, output_list)
 
-    workbook = load_workbook("output_v2_relative.xlsx")
+    workbook = load_workbook("output.xlsx")
 
-    # paint_cells(green_fill, yellow_fill, red_fill, workbook)
+    paint_cells(green_fill, yellow_fill, red_fill, workbook)
 
 
 if __name__ == "__main__":
